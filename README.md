@@ -1,9 +1,3 @@
----
-
-editor_options: 
-  markdown: 
-    wrap: 72
----
 
 # R Script for Belowground-drought response analysis
 
