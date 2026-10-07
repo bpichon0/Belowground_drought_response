@@ -9,6 +9,10 @@ editor_options:
 
 Contact: ***benoit.pichon0\@gmail.com***
 
+<p align="center">
+    <img src="https://github.com/bpichon0/Belowground_drought_response/blob/master/Data/idea_project.png" width="800">
+</p>
+
 There are 4 numbered scripts. The **0_Functions.R** is some utility funtions.
 
 ### Script 1: building the dataset 
@@ -22,12 +26,13 @@ There are 4 numbered scripts. The **0_Functions.R** is some utility funtions.
   - Log-ratio metrics
 - Perform phylogenetic diversity analyses
 - Perform trait analyses (PCA, trait representativity, CWM + FD along PCA axes)
-- Merge everything together
+- Merge everything together. *Note that we only provide for SPEI 3, 6, 9 in the git to reduce the size of the data. But running the analyses can generate the full list with the 24 SPEI timescales*
 
 ### Script 2: Analyse the data
 
 Analyse the data along LUI, SPEI gradients, along each separate LUI component (fertilization, mowing, grazing) and then pairing resilience and resistance.
+ 
 
 ### Script 3: Making the figure
 
-The figures are organized in three sections, based on the paper ones
+The figures are organized in three sections, based on the paper ones.
