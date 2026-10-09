@@ -25,8 +25,7 @@ There are 4 numbered scripts. The **0_Functions.R** is some utility funtions.
 ### Script 2: Analyse the data
 
 Analyse the data along LUI, SPEI gradients, along each separate LUI component (fertilization, mowing, grazing) and then pairing resilience and resistance.
- 
 
 ### Script 3: Making the figure
 
-The figures are organized in three sections, based on the paper ones.
+The figures are organized in three sections, based on the paper ones. The output of the main analyses are available in the **Results** folder to make the figures.

@@ -13,6 +13,8 @@ get_month_from_day = function(day_of_year, year) {
 
 color_trait_axes=c( "#8F9DD8","#E2AA84","#82B7A4")
 fill_trait_axes=c( "#C7CEEA","#FFDAC1","#B5EAD7")
+dir.create("./Results",showWarnings = F)
+dir.create("./Figures",showWarnings = F)
 
 
 ## UTILS FUNCTIONS ----
@@ -497,6 +499,155 @@ Plot_MV_figure = function(d, stability_var = "Resistance_Isbell",
     
     return(p)
   }
+}
+
+pastel_pcaxis = c(
+  "PC1: Economics (slow - fast)"  = "#FBB280",
+  "PC2: Absorption (AMF - hairs)" = "#FF6699",
+  "PC3: Exploration (AD - SRL)"   = "#3366cc"
+)
+
+Plot_MV_paired_by_response_join = function(d_Rs, d_Rl,
+                                       grepl_character = "CWM",
+                                       CI_inner   = 90,
+                                       CI_outer   = 95,
+                                       alpha_     = 0.15,
+                                       Pos_node = .9,
+                                       Pos_node_x = 1.7,
+                                       same_y     = TRUE,
+                                       Node=T,
+                                       negative_x = FALSE,
+                                       axis_palette = pastel_pcaxis,
+                                       x_label    = "Land-use intensity") {
+  
+  prep = function(df, resp_label, stab) {
+    df %>%
+      dplyr::filter(Stability_var == stab) %>%
+      dplyr::select(-Stability_var) %>%
+      tidyr::pivot_longer(-Variable_gradient,
+                          names_to = "Predictor", values_to = "Effect_size") %>%
+      dplyr::filter(grepl(grepl_character, Predictor), !is.na(Effect_size)) %>%
+      dplyr::mutate(
+        Axis = dplyr::case_when(
+          grepl("PC1", Predictor) ~ "PC1: Economics (slow - fast)",
+          grepl("PC2", Predictor) ~ "PC2: Absorption (AMF - hairs)",
+          grepl("PC3", Predictor) ~ "PC3: Exploration (AD - SRL)",
+          TRUE ~ "Other"
+        ),
+        Response = resp_label
+      )
+  }
+  
+  d_Rs_sub = prep(d_Rs, "Drought resistance", "Resistance_Isbell")
+  d_Rl_sub = prep(d_Rl, "Drought resilience", "Resilience_Isbell_abs")
+  
+  d_plot = dplyr::bind_rows(d_Rs_sub, d_Rl_sub) %>%
+    dplyr::filter(Axis != "Other") %>%
+    dplyr::mutate(
+      Response = factor(Response,
+                        levels = c("Drought resistance", "Drought resilience")),
+      Variable_gradient = as.numeric(Variable_gradient)
+    )
+  
+  if (negative_x) {
+    d_plot = d_plot %>% dplyr::mutate(Variable_gradient = -Variable_gradient)
+  }
+  if (nrow(d_plot) == 0) stop("No rows after filtering; check Predictor names.")
+  
+  d_sum = d_plot %>%
+    dplyr::group_by(Response, Axis, Variable_gradient) %>%
+    dplyr::summarise(
+      q1_out = quantile(Effect_size, (1 - CI_outer/100)/2, na.rm = TRUE),
+      q3_out = quantile(Effect_size, (1 - (1 - CI_outer/100)/2), na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(significant = (q1_out > 0) | (q3_out < 0))
+  
+  d_sig = d_sum %>%
+    dplyr::filter(significant) %>%
+    dplyr::group_by(Response) %>%
+    dplyr::mutate(
+      y_top  = max(q3_out, na.rm = TRUE),
+      y_mark = dplyr::case_when(
+        Axis == "PC1: Economics (slow - fast)"  ~ y_top * 1.06,
+        Axis == "PC2: Absorption (AMF - hairs)" ~ y_top * 1.16,
+        Axis == "PC3: Exploration (AD - SRL)"   ~ y_top * 1.26
+      )
+    ) %>%
+    dplyr::ungroup()
+  
+  axis_levels = intersect(
+    c("PC1: Economics (slow - fast)",
+      "PC2: Absorption (AMF - hairs)",
+      "PC3: Exploration (AD - SRL)"),
+    unique(d_plot$Axis)
+  )
+  d_plot$Axis <- factor(d_plot$Axis, levels = axis_levels)
+  d_sig$Axis  <- factor(d_sig$Axis,  levels = axis_levels)
+  
+  axis_palette_present = axis_palette[axis_levels]
+  
+  banner_df = data.frame(
+    Response = factor(c("Drought resistance", "Drought resilience"),
+                      levels = c("Drought resistance", "Drought resilience")),
+    x = Pos_node_x,
+    y = Pos_node,
+    label = c("Drought resistance", "Drought resilience")
+  )
+  
+  p = ggplot(d_plot,
+             aes(x = Variable_gradient, y = Effect_size,
+                 group = Axis, color = Axis, fill = Axis)) +
+    geom_smooth(se = FALSE, linewidth = 1) +
+    stat_summary(
+      fun.data = function(x) {
+        data.frame(ymin = quantile(x, (1 - CI_outer/100)/2, na.rm = TRUE),
+                   ymax = quantile(x, (1 - (1 - CI_outer/100)/2), na.rm = TRUE))
+      },
+      geom = "ribbon", alpha = alpha_, color = NA
+    ) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_linerange(data = d_sig,
+                   aes(x = Variable_gradient,
+                       ymin = y_mark - 0.02 * abs(y_mark),
+                       ymax = y_mark + 0.02 * abs(y_mark),
+                       color = Axis),
+                   linewidth = 1.5, show.legend = FALSE, inherit.aes = FALSE) +
+    geom_linerange(data = d_sig,
+                   aes(x = Variable_gradient,
+                       ymin = y_mark - 0.008 * abs(y_mark),
+                       ymax = y_mark + 0.008 * abs(y_mark),
+                       color = Axis),
+                   linewidth = 0.5, show.legend = FALSE, inherit.aes = FALSE) +
+    scale_color_manual(values = axis_palette_present) +
+    scale_fill_manual(values  = axis_palette_present) +
+    facet_wrap(~ Response, nrow = 1,
+               scales = if (same_y) "fixed" else "free_y") +
+    coord_cartesian(clip = "off") +
+    labs(x = x_label, y = "Effect size", color = "", fill = "") +
+    the_theme2 +
+    theme(
+      legend.position  = "bottom",
+      strip.text       = element_blank(),
+      strip.background = element_blank(),
+    )+theme(strip.text.x = element_blank())
+  if (Node){
+    p=p+    geom_node_label(
+      data = banner_df,
+      aes(x = x, y = y, label = label),
+      inherit.aes   = FALSE,
+      vjust         = 1.3,
+      color         = "white",
+      fill          = "black",
+      label.size    = 1,
+      family        = "NewCenturySchoolbook",
+      label.padding = unit(0.5, "lines"),
+      label.r       = unit(0.3, "lines"),
+      size          = 4.5
+    ) 
+  }
+  return(p)
+  
 }
 
 Plot_MV_paired_by_axis_join = function(d_Rs, d_Rl,

@@ -2,9 +2,7 @@ rm(list=ls())
 source("0_Functions.R")
 # --------------------------- Design final figures ----------------------------------------
 
-
 # Figure 2
-
 
 d=readRDS("./Results/Moving_window_gradient_all_results_Geo_clim_model.rds")
 p1=Plot_variance_partitioning(d$SPEI06$Coeff_variance,alpha1 = .8,alpha2 = .5,smooth = T,smooth_window = 5)
@@ -49,32 +47,39 @@ ggsave("./Figures/Figure_2.pdf",figure2,width = 8,height = 8)
 
 # Figure 3
 
-d=readRDS("./Results/Moving_window_gradient_all_results_Geo_clim_model.rds")
+d = readRDS("./Results/Moving_window_gradient_all_results_Geo_clim_model.rds")
 
-p_CWM = Plot_MV_paired_by_axis_join(
+p_CWM = Plot_MV_paired_by_response_join(
+  Pos_node = .9,
   d_Rs = d$SPEI06$Partial_residuals,
   d_Rl = d$SPEI06$Partial_residuals,
-  grepl_character = "CWM"
+  grepl_character = "CWM",
+  x_label = "Land use intensity",
+  alpha_  = 0.7
 )
 
-p_FD = Plot_MV_paired_by_axis_join(
-  d_Rs = d$SPEI06$Partial_residuals,
-  d_Rl = d$SPEI06$Partial_residuals,
-  grepl_character = "FD"
+p_FD = Plot_MV_paired_by_response_join(
+  Pos_node = .8,d_Rs = d$SPEI06$Partial_residuals,d_Rl = d$SPEI06$Partial_residuals,
+  grepl_character = "FD",x_label = "Land use intensity",alpha_  = 0.7,Node = F
 )
-ggsave("./Figures/Figure_3.pdf",ggarrange(p_CWM+ylab("Effect size of mean community trait"),
-                                          p_FD+ylab("Effect size of trait diversity"),
-                                          nrow = 2,labels = letters[1:2],common.legend = T,legend = "bottom"),
-       width = 8,height = 8)
+
+p_traits = ggarrange(p_CWM+ylab("Effect size of mean community traits")+
+                       theme(axis.title = element_text(size=14)),
+                     p_FD+theme(legend.position = "none")+
+                       ylab("Effect size of trait diversity")+
+                       theme(axis.title = element_text(size=14)),
+                     ncol = 1,labels = c("a", "b"),heights = c(1,.9),
+  common.legend = TRUE,legend = "bottom")
+
+ggsave("./Figures/Figure_3.pdf",p_traits,width = 8,height = 9)
 
 # Figure 4
 
 d=readRDS("./Results/Moving_window_gradient_all_results_SPEI.rds")
 
-p_FD = Plot_MV_paired_by_axis_join(
-  d_Rs = d$SPEI06$Partial_residuals,
-  d_Rl = d$SPEI06$Partial_residuals,negative_x = T,
-  grepl_character = "FD"
+p_FD = Plot_MV_paired_by_response_join(
+  Pos_node = 1.2,d_Rs = d$SPEI06$Partial_residuals,d_Rl = d$SPEI06$Partial_residuals,
+  grepl_character = "FD",alpha_  = 0.7,Node = T,Pos_node_x = 1.4,negative_x = T
 )
 ggsave("./Figures/Figure_4.pdf",p_FD+ylab("Effect size of trait diversity")+
          xlab("Drought intensity \n <- Moderate drought      Extreme drought ->"),
@@ -197,7 +202,7 @@ p_A = ggplot() +
   geom_abline(data = d_A_slopes,
               aes(slope = slope, intercept = intercept,group=Predictor),
               color = "#3366cc", alpha = 0.15, linewidth = 0.3) +
-  facet_wrap(.~Predictor,nrow=2,scales="free")+
+  facet_wrap(. ~ Predictor, nrow = 2, scales = "free_x", space = "free_x") +
   geom_point(data = d_A_avg,
              aes(x = Effect_size_Rs, y = Effect_size_Rl),
              color = "black", size = 2) +
@@ -210,21 +215,28 @@ cors_all = cors_all %>%
     PC         = sub("^\\S+\\s+(PC\\d).*$", "\\1", Predictor),
     Trait_type = sub("^(\\S+).*$", "\\1", Predictor)
   )%>%
-  dplyr::mutate(., Gradient=recode_factor(Gradient,"LUI"="Along LUI gradient",
-                                          "SPEI"="Along SPEI gradient"))
+  dplyr::mutate(
+    Gradient   = dplyr::recode(Gradient,
+                               "LUI"  = "Along land-use gradient",
+                               "SPEI" = "Along drought gradient"),
+    Trait_type = dplyr::recode(Trait_type,
+                               "CWM" = "Community-weighted mean",
+                               "FD"  = "Functional diversity")
+  )
+
 
 p_B = ggplot(cors_all,
              aes(x = r, fill = PC, color = PC)) +
   geom_density(alpha = 0.7, linewidth = 0.5) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
   facet_grid(Gradient ~ Trait_type, scales = "fixed") +
-  scale_fill_manual(values  = c("PC1" = "#FFDAC1",
+  scale_fill_manual(values  = c("PC1" = "#FBB280",
                                 "PC2" = "#FF6699",
                                 "PC3" = "#3366cc"),
                     labels = c("PC1: Economics (slow - fast)",
                                "PC2: Absorption (AMF - hairs)",
                                "PC3: Exploration (AD - SRL)")) +
-  scale_color_manual(values = c("PC1" = "#FFDAC1",
+  scale_color_manual(values = c("PC1" = "#FBB280",
                                 "PC2" = "#FF6699",
                                 "PC3" = "#3366cc"),
                      labels = c("PC1: Economics (slow - fast)",
@@ -234,29 +246,29 @@ p_B = ggplot(cors_all,
        y = "Density", fill = "", color = "") +
   the_theme2 +
   theme(    
-    strip.text.x.top = element_text(colour = "white", size = 13),
-    strip.text.y.right = element_text(colour = "white", size = 13),
+    strip.text.x.top = element_text(colour = "white", size = 11),
+    strip.text.y.right = element_text(colour = "white", size = 11),
     legend.position = "bottom",
     strip.background = element_rect(fill = "black", color = NA),
     panel.spacing = unit(0.6, "lines"))
 
+p_A2=ggarrange(ggplot()+theme_void(),p_A,ggplot()+theme_void(),nrow=3,heights = c(.8,3.5,.8))
+
 ggsave("./Figures/Figure_5_tradeoff.pdf",
-       ggarrange(p_A, p_B,ncol = 2, nrow = 1,
-                 widths = c(1, 1.6),labels = c("a", "b")),
-       width = 13, height = 7)
+       ggarrange(p_A2, p_B,ncol = 2, nrow = 1,
+                 widths = c(1, 1.3),labels = c("a", "b")),
+       width = 14, height = 5)
 
 
 # --------------------------- Design Extended ----------------------------------------
 
 d=readRDS("./Results/Moving_window_gradient_all_results_SPEI.rds")
 
-p_CWM = Plot_MV_paired_by_axis_join(
-  d_Rs = d$SPEI06$Partial_residuals,
-  d_Rl = d$SPEI06$Partial_residuals,negative_x = T,
-  grepl_character = "CWM"
+p_FD = Plot_MV_paired_by_response_join(
+  Pos_node = 1.2,d_Rs = d$SPEI06$Partial_residuals,d_Rl = d$SPEI06$Partial_residuals,
+  grepl_character = "CWM",alpha_  = 0.7,Node = T,Pos_node_x = 1.4,negative_x = T
 )
-ggsave("./Figures/Figure_extended_SPEI_CWM.pdf",
-       p_CWM+ylab("Effect size of mean community trait")+
+ggsave("./Figures/Figure_extended_SPEI_CWM.pdf",p_FD+ylab("Effect size of mean community trait")+
          xlab("Drought intensity \n <- Moderate drought      Extreme drought ->"),
        width = 8,height = 4)
 
