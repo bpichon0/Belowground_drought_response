@@ -582,12 +582,6 @@ ggsave("./Figures/PCA_traits_above_below_comparison.pdf",p_tot,width = 8,height 
 # Trait CWM
 rm(list=ls())
 source("0_Functions.R")
-library(dplyr)
-library(tidyr)
-library(purrr)
-library(psych)
-library(paran)
-library(FD)
 
 traits_all   = c("SRL","RTD","AD","RN","RHL","AMF","RHI",
                  "Seed_mass","SLA_all","Height","LDMC","LeafN","LeafP")

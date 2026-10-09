@@ -1,7 +1,8 @@
 x=c("sf","raster","elevatr","ggplot2","ggpubr","rnaturalearth","V.PhyloMaker",
     "rnaturalearthhires","ggspatial","reshape2","tidyverse","FD","car","funrar",
     "missForest","ape","lme4","LMERConvenienceFunctions","lmerTest","lmeresampler",
-    "MuMIn","boot","nlme","boot","visreg","arm","purrr","DHARMa","spdep","nlme","mgcv","zoo")
+    "MuMIn","boot","nlme","boot","visreg","arm","purrr","DHARMa","spdep","nlme","mgcv","zoo",
+    "ggraph","psych","paran")
 lapply(x, require, character.only = TRUE)
 # lapply(x, install.packages, character.only = TRUE)
 get_month_from_day = function(day_of_year, year) {
@@ -18,7 +19,6 @@ fill_trait_axes=c( "#C7CEEA","#FFDAC1","#B5EAD7")
 
 Plot_correlation_variables=function(d){
   d=d[,colnames(dplyr::select_if (d, is.numeric))]
-  library(psych)
   corr_pred=corr.test(d,use = "pairwise.complete.obs",adjust = "none")
   
   corr_pred$r=round(corr_pred$r,2)
@@ -157,26 +157,17 @@ plotPCA = function(fitScores, fitLoadings, fitVaccounted, xIndex, yIndex, xLim, 
 Closer_to_normal_traits=function(d){
   return(d%>%
            dplyr::mutate(., 
-                         RN=sqrt(RN),
-                         RTD=sqrt(RTD),
-                         RD=log(RD),
-                         SRL=log(SRL),
                          SRL_HP=log(SRL_HP),
                          RTD_HP=log(RTD_HP),
                          AD_HP=log(AD_HP),
                          RN_HP=bcPower(RN_HP+.1,.9),
                          RHL_HP=sqrt(RHL_HP),
                          RHI_HP=sqrt(RHI_HP),
-                         RDepth=bcPower(RDepth,.2),
-                         LRExtent=log(LRExtent),
-                         BBdepth=sqrt(BBdepth),
                          LeafP=sqrt(LeafP),
                          LeafN=log(LeafN),
                          Height=bcPower(Height,-.3),
                          Seed_mass=bcPower(Seed_mass,0),
-                         Lateral.expansion=sqrt(Lateral.expansion),
-                         LDMC=sqrt(LDMC),
-                         CloGenExt=bcPower(CloGenExt,.4)))
+                         LDMC=sqrt(LDMC)))
 }
 
 
@@ -515,8 +506,8 @@ Plot_MV_paired_by_axis_join = function(d_Rs, d_Rl,
                                        alpha_ = .15,
                                        same_y = TRUE,
                                        negative_x=F,
-                                       color_Rs = "#22223B",
-                                       color_Rl = "#EC7692") {
+                                       color_Rs = "#3366cc",
+                                       color_Rl = "#FF6699") {
   
   prep = function(df, resp_label, stab) {
     df %>%
@@ -612,10 +603,43 @@ Plot_MV_paired_by_axis_join = function(d_Rs, d_Rl,
   return(p)
 }
 
+
+smooth_rolling_median = function(raw, group_col, window = 3, n_grid = 300) {
+  
+  if (window < 3) window <- 3
+  if (window %% 2 == 0) window <- window + 1
+  
+  raw %>%
+    dplyr::group_split(.data[[group_col]]) %>%
+    purrr::map_dfr(function(df) {
+      df = df %>% dplyr::arrange(Variable_gradient)
+      if (nrow(df) < window) return(df)
+      
+      xg   = seq(min(df$Variable_gradient), max(df$Variable_gradient),
+                 length.out = n_grid)
+      y_sm = stats::runmed(df$fraction, k = window, endrule = "median")
+      
+      tibble::tibble(
+        Variable_gradient = xg,
+        Stability_var     = unique(df$Stability_var),
+        !!group_col       := unique(df[[group_col]]),
+        fraction          = approx(df$Variable_gradient, y_sm,
+                                   xout = xg, rule = 2)$y
+      )
+    }) %>%
+    dplyr::group_by(Variable_gradient, Stability_var) %>%
+    dplyr::mutate(fraction = pmax(fraction, 0),
+                  fraction = fraction / sum(fraction, na.rm = TRUE)) %>%
+    dplyr::ungroup()
+}
+
 Plot_variance_partitioning = function(d, alpha1 = .85, alpha2 = .5,
-                                      negative_x=F,
-                                      stability_var = "Resistance_Isbell",
-                                      binary = FALSE) {   
+                                      negative_x     = F,
+                                      stability_var  = "Resistance_Isbell",
+                                      binary         = FALSE,
+                                      smooth         = TRUE,
+                                      smooth_window  = 3,
+                                      n_grid         = 300) {
   
   frac_var_explained = d %>%
     dplyr::rename(var = Predictor) %>%
@@ -653,10 +677,7 @@ Plot_variance_partitioning = function(d, alpha1 = .85, alpha2 = .5,
   
   base_data = frac_var_explained %>%
     dplyr::mutate(Effect_size = Effect_size^2) %>%
-    dplyr::filter(
-      Stability_var == stability_var,
-      !is.na(var_type)
-    )
+    dplyr::filter(Stability_var == stability_var, !is.na(var_type))
   
   pastel_vartype = c(
     "Identity dominant sp." = "#AEC6CF",
@@ -665,34 +686,32 @@ Plot_variance_partitioning = function(d, alpha1 = .85, alpha2 = .5,
     "Taxonomic div."        = "#FFDAC1",
     "Geography & climate"   = "grey20"
   )
-  
   pastel_pcaxis = c(
-    "PC1: Economics (slow - fast)"     = "#C7CEEA",
-    "PC2: Absorption (AMF - hairs)"    = "#FFDAC1",
-    "PC3: Exploration (AD - SRL)"    = "#B5EAD7"
+    "PC1: Economics (slow - fast)"  = "#FFDAC1",
+    "PC2: Absorption (AMF - hairs)" = "#FF6699",
+    "PC3: Exploration (AD - SRL)"   = "#3366cc"
   )
-  
   pastel_pcaxis3 = c(
-    "PC1: Economics (slow - fast)"     = "#C7CEEA",
-    "PC2: Absorption (AMF - hairs)"    = "#FFDAC1",
-    "PC3: Exploration (AD - SRL)"    = "#B5EAD7",
-    "Phylogenetic & taxo div."         = "grey"
+    "PC1: Economics (slow - fast)"  = "#C7CEEA",
+    "PC2: Absorption (AMF - hairs)" = "#FFDAC1",
+    "PC3: Exploration (AD - SRL)"   = "#B5EAD7",
+    "Phylogenetic & taxo div."      = "grey"
   )
-  
   pastel_pcaxis2 = c(
-    "Diversity (Exploration)"             = "#82B7A4",
-    "Diversity (Economics)"                 = "#8F9DD8",
-    "Diversity (Absorption)"                = "#E2AA84",
-    "Identity (Economics)"                  = "#C7CEEA",
-    "Identity (Absorption)"                 = "#FFDAC1",
-    "Phylogenetic & taxo div."              = "grey",
-    "Identity (Exploration)"              = "#B5EAD7"
+    "Diversity (Exploration)"  = "#82B7A4",
+    "Diversity (Economics)"    = "#8F9DD8",
+    "Diversity (Absorption)"   = "#E2AA84",
+    "Identity (Economics)"     = "#C7CEEA",
+    "Identity (Absorption)"    = "#FFDAC1",
+    "Phylogenetic & taxo div." = "grey",
+    "Identity (Exploration)"   = "#B5EAD7"
   )
   
-  if (negative_x) base_data=base_data%>%dplyr::mutate(., Variable_gradient=-Variable_gradient)
+  if (negative_x) {
+    base_data = base_data %>% dplyr::mutate(Variable_gradient = -Variable_gradient)
+  }
   
   if (binary) {
-    
     base_data = base_data %>%
       dplyr::mutate(Variable_gradient = factor(Variable_gradient,
                                                levels = c("NO", "YES")))
@@ -709,10 +728,8 @@ Plot_variance_partitioning = function(d, alpha1 = .85, alpha2 = .5,
       geom_col(alpha = alpha1, width = 0.6) +
       scale_fill_manual(values = pastel_vartype) +
       labs(x = "Fertilization treatment",
-           y = "Fraction of explained variance",
-           fill = "") +
-      the_theme2 +
-      guides(fill = guide_legend(nrow = 2))
+           y = "Fraction of explained variance", fill = "") +
+      the_theme2 + guides(fill = guide_legend(nrow = 2))
     
     frac_var_pc = base_data %>%
       dplyr::filter(PC_group == "PC_axes") %>%
@@ -727,10 +744,8 @@ Plot_variance_partitioning = function(d, alpha1 = .85, alpha2 = .5,
       geom_col(alpha = alpha1, width = 0.6) +
       scale_fill_manual(values = pastel_pcaxis) +
       labs(x = "Fertilization treatment",
-           y = "Fraction of explained variance",
-           fill = "") +
-      the_theme2 +
-      guides(fill = guide_legend(nrow = 2))
+           y = "Fraction of explained variance", fill = "") +
+      the_theme2 + guides(fill = guide_legend(nrow = 2))
     
     frac_var_pc2 = base_data %>%
       dplyr::filter(PC_axis2 != "Other") %>%
@@ -745,10 +760,8 @@ Plot_variance_partitioning = function(d, alpha1 = .85, alpha2 = .5,
       geom_col(alpha = alpha2, width = 0.6) +
       scale_fill_manual(values = pastel_pcaxis2) +
       labs(x = "Fertilization treatment",
-           y = "Fraction of explained variance",
-           fill = "") +
-      the_theme2 +
-      guides(fill = guide_legend(nrow = 3))
+           y = "Fraction of explained variance", fill = "") +
+      the_theme2 + guides(fill = guide_legend(nrow = 3))
     
     frac_var_pc3 = base_data %>%
       dplyr::filter(PC_axis3 != "Other") %>%
@@ -763,10 +776,8 @@ Plot_variance_partitioning = function(d, alpha1 = .85, alpha2 = .5,
       geom_col(alpha = alpha1, width = 0.6) +
       scale_fill_manual(values = pastel_pcaxis3) +
       labs(x = "Fertilization treatment",
-           y = "Fraction of explained variance",
-           fill = "") +
-      the_theme2 +
-      guides(fill = guide_legend(nrow = 2))
+           y = "Fraction of explained variance", fill = "") +
+      the_theme2 + guides(fill = guide_legend(nrow = 2))
     
     return(list(p1 = p1, p2 = p2, p3 = p3, p4 = p4))
   }
@@ -778,6 +789,12 @@ Plot_variance_partitioning = function(d, alpha1 = .85, alpha2 = .5,
     dplyr::mutate(fraction = total_var / sum(total_var, na.rm = TRUE)) %>%
     dplyr::ungroup()
   
+  if (smooth) {
+    frac_var_explained_vartype = smooth_rolling_median(
+      frac_var_explained_vartype, group_col = "var_type",
+      window = smooth_window, n_grid = n_grid)
+  }
+  
   p1 = ggplot(frac_var_explained_vartype,
               aes(x = Variable_gradient, y = fraction, fill = var_type)) +
     geom_area(alpha = alpha1, position = "stack") +
@@ -785,7 +802,7 @@ Plot_variance_partitioning = function(d, alpha1 = .85, alpha2 = .5,
     labs(x = "LUI", y = "Fraction of explained variance", fill = "") +
     the_theme2 + guides(fill = guide_legend(nrow = 2))
   
-  frac_var_explained_pcaxis = base_data %>%
+  frac_pcaxis = base_data %>%
     dplyr::filter(PC_group == "PC_axes") %>%
     dplyr::group_by(Variable_gradient, Stability_var, PC_axis) %>%
     dplyr::summarise(total_var = sum(Effect_size, na.rm = TRUE), .groups = "drop_last") %>%
@@ -793,14 +810,20 @@ Plot_variance_partitioning = function(d, alpha1 = .85, alpha2 = .5,
     dplyr::mutate(fraction = total_var / sum(total_var, na.rm = TRUE)) %>%
     dplyr::ungroup()
   
-  p2 = ggplot(frac_var_explained_pcaxis,
+  if (smooth) {
+    frac_pcaxis = smooth_rolling_median(
+      frac_pcaxis, group_col = "PC_axis",
+      window = smooth_window, n_grid = n_grid)
+  }
+  
+  p2 = ggplot(frac_pcaxis,
               aes(x = Variable_gradient, y = fraction, fill = PC_axis)) +
     geom_area(alpha = alpha1, position = "stack") +
     scale_fill_manual(values = pastel_pcaxis) +
     labs(x = "LUI", y = "Fraction of explained variance", fill = "") +
     the_theme2 + guides(fill = guide_legend(nrow = 2))
   
-  frac_var_explained_pcaxis = base_data %>%
+  frac_pcaxis2 = base_data %>%
     dplyr::filter(PC_axis2 != "Other") %>%
     dplyr::group_by(Variable_gradient, Stability_var, PC_axis2) %>%
     dplyr::summarise(total_var = sum(Effect_size, na.rm = TRUE), .groups = "drop_last") %>%
@@ -808,14 +831,20 @@ Plot_variance_partitioning = function(d, alpha1 = .85, alpha2 = .5,
     dplyr::mutate(fraction = total_var / sum(total_var, na.rm = TRUE)) %>%
     dplyr::ungroup()
   
-  p3 = ggplot(frac_var_explained_pcaxis,
+  if (smooth) {
+    frac_pcaxis2 = smooth_rolling_median(
+      frac_pcaxis2, group_col = "PC_axis2",
+      window = smooth_window, n_grid = n_grid)
+  }
+  
+  p3 = ggplot(frac_pcaxis2,
               aes(x = Variable_gradient, y = fraction, fill = PC_axis2)) +
     geom_area(alpha = alpha2, position = "stack") +
     scale_fill_manual(values = pastel_pcaxis2) +
     labs(x = "LUI", y = "Fraction of explained variance", fill = "") +
     the_theme2 + guides(fill = guide_legend(nrow = 3))
   
-  frac_var_explained_pcaxis = base_data %>%
+  frac_pcaxis3 = base_data %>%
     dplyr::filter(PC_axis3 != "Other") %>%
     dplyr::group_by(Variable_gradient, Stability_var, PC_axis3) %>%
     dplyr::summarise(total_var = sum(Effect_size, na.rm = TRUE), .groups = "drop_last") %>%
@@ -823,7 +852,13 @@ Plot_variance_partitioning = function(d, alpha1 = .85, alpha2 = .5,
     dplyr::mutate(fraction = total_var / sum(total_var, na.rm = TRUE)) %>%
     dplyr::ungroup()
   
-  p4 = ggplot(frac_var_explained_pcaxis,
+  if (smooth) {
+    frac_pcaxis3 = smooth_rolling_median(
+      frac_pcaxis3, group_col = "PC_axis3",
+      window = smooth_window, n_grid = n_grid)
+  }
+  
+  p4 = ggplot(frac_pcaxis3,
               aes(x = Variable_gradient, y = fraction, fill = PC_axis3)) +
     geom_area(alpha = alpha1, position = "stack") +
     scale_fill_manual(values = pastel_pcaxis3) +
@@ -832,7 +867,6 @@ Plot_variance_partitioning = function(d, alpha1 = .85, alpha2 = .5,
   
   return(list(p1 = p1, p2 = p2, p3 = p3, p4 = p4))
 }
-
 
 Indiv_trait="AD"
 dataset = "HairPhae"
@@ -847,7 +881,7 @@ random = "both"
 phylo=T
 drought_category = c("Moderate drought","Extreme drought")
 diversity_type = c("FD")
-correct_clim_residuals=F
+correct_clim_residuals=T
 
 Moving_window_gradient_diversity = function(dataset = "Underplot",
                                             stability_var,

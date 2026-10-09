@@ -5,18 +5,18 @@ source("0_Functions.R")
 
 # Figure 2
 
-library(ggraph)
+
 d=readRDS("./Results/Moving_window_gradient_all_results_Geo_clim_model.rds")
-p1=Plot_variance_partitioning(d$SPEI06$Coeff_variance,alpha1 = 1,alpha2 = 1)
-p2=Plot_variance_partitioning(d$SPEI06$Coeff_variance,alpha1 = 1,alpha2 = 1,
+p1=Plot_variance_partitioning(d$SPEI06$Coeff_variance,alpha1 = .8,alpha2 = .5,smooth = T,smooth_window = 5)
+p2=Plot_variance_partitioning(d$SPEI06$Coeff_variance,alpha1 = .8,alpha2 = .5,smooth = T,smooth_window = 5,
                               stability_var = "Resilience_Isbell_abs")
 
 d=readRDS("./Results/Moving_window_gradient_all_results_SPEI.rds")
-p3=Plot_variance_partitioning(d$SPEI06$Coeff_variance,alpha1 = 1,alpha2 = 1,negative_x = T)
-p4=Plot_variance_partitioning(d$SPEI06$Coeff_variance,alpha1 = 1,alpha2 = 1,negative_x = T,
+p3=Plot_variance_partitioning(d$SPEI06$Coeff_variance,alpha1 = .8,alpha2 = 1,negative_x = T,smooth = T,smooth_window = 5)
+p4=Plot_variance_partitioning(d$SPEI06$Coeff_variance,alpha1 = .8,alpha2 = 1,negative_x = T,smooth = T,smooth_window = 5,
                               stability_var = "Resilience_Isbell_abs")
 
-figure2=(ggarrange(p1$p2+labs(y="Explained variance (%)",x="Land-use intensity")+
+figure2=(ggarrange(p1$p2+labs(y="Relative importance (%)",x="Land-use intensity")+
                      geom_node_label(
                        data = NULL,
                        aes(x = 1.7, y = 1.05, label = "Drought resistance"),
@@ -28,7 +28,7 @@ figure2=(ggarrange(p1$p2+labs(y="Explained variance (%)",x="Land-use intensity")
                        label.r = unit(0.3, "lines"),  
                        size = 4.5             
                      )+ guides(fill = guide_legend(nrow = 1)),
-                   p2$p2+labs(y="Explained variance (%)",x="Land-use intensity")+
+                   p2$p2+labs(y="Relative importance (%)",x="Land-use intensity")+
                      geom_node_label(
                        data = NULL,
                        aes(x = 1.7, y = 1.05, label = "Drought resilience"),
@@ -40,8 +40,8 @@ figure2=(ggarrange(p1$p2+labs(y="Explained variance (%)",x="Land-use intensity")
                        label.r = unit(0.3, "lines"),  
                        size = 4.5             
                      ),
-                   p3$p2+labs(y="Explained variance (%)",x="Drought intensity \n <- Moderate drought      Extreme drought ->"),
-                   p4$p2+labs(y="Explained variance (%)",x="Drought intensity \n <- Moderate drought      Extreme drought ->"),nrow=2,ncol=2,common.legend = T,legend = "bottom"))
+                   p3$p2+labs(y="Relative importance (%)",x="Drought intensity \n <- Moderate drought      Extreme drought ->"),
+                   p4$p2+labs(y="Relative importance (%)",x="Drought intensity \n <- Moderate drought      Extreme drought ->"),nrow=2,ncol=2,common.legend = T,legend = "bottom"))
 
 ggsave("./Figures/Figure_2.pdf",figure2,width = 8,height = 8)
 
@@ -196,7 +196,7 @@ p_A = ggplot() +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
   geom_abline(data = d_A_slopes,
               aes(slope = slope, intercept = intercept,group=Predictor),
-              color = "#B5EAD7", alpha = 0.15, linewidth = 0.3) +
+              color = "#3366cc", alpha = 0.15, linewidth = 0.3) +
   facet_wrap(.~Predictor,nrow=2,scales="free")+
   geom_point(data = d_A_avg,
              aes(x = Effect_size_Rs, y = Effect_size_Rl),
@@ -218,15 +218,15 @@ p_B = ggplot(cors_all,
   geom_density(alpha = 0.7, linewidth = 0.5) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
   facet_grid(Gradient ~ Trait_type, scales = "fixed") +
-  scale_fill_manual(values  = c("PC1" = "#C7CEEA",
-                                "PC2" = "#FFDAC1",
-                                "PC3" = "#B5EAD7"),
+  scale_fill_manual(values  = c("PC1" = "#FFDAC1",
+                                "PC2" = "#FF6699",
+                                "PC3" = "#3366cc"),
                     labels = c("PC1: Economics (slow - fast)",
                                "PC2: Absorption (AMF - hairs)",
                                "PC3: Exploration (AD - SRL)")) +
-  scale_color_manual(values = c("PC1" = "#C7CEEA",
-                                "PC2" = "#FFDAC1",
-                                "PC3" = "#B5EAD7"),
+  scale_color_manual(values = c("PC1" = "#FFDAC1",
+                                "PC2" = "#FF6699",
+                                "PC3" = "#3366cc"),
                      labels = c("PC1: Economics (slow - fast)",
                                 "PC2: Absorption (AMF - hairs)",
                                 "PC3: Exploration (AD - SRL)")) +
@@ -1036,8 +1036,8 @@ Plot_MV_binary_by_axis = function(d_res, d_rel,
                                   CI_inner = 90,
                                   CI_outer = 95,
                                   gradientname = "fertilisation",
-                                  color_Rs = "#22223B",
-                                  color_Rl = "#EC7692",
+                                  color_Rs = "#3366cc",
+                                  color_Rl = "#FF6699",
                                   alpha_non_sig = 0.25) {
   
   prep = function(df, resp_label, stab) {

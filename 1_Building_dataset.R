@@ -1,5 +1,6 @@
 rm(list=ls())
 source("0_Functions.R")
+
 # ---------------------- Step 1: Getting SPEI & resistance/resilience  ----
 
 ## >> 1) Thresholds for droughts (Moderate & extreme) ----
@@ -702,6 +703,7 @@ global_traits=read.table("./Data/Global_trait_dataset.csv",sep=";")%>%
                             # "Myco_intensity",
                             "SLA_all","Height","LDMC","LeafN","LeafP")))%>%
   drop_na(.)
+
 
 all_traits =  veg_data %>%
   dplyr::mutate(
